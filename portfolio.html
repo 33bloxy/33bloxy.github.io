@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>33bloxy Portfolio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #e9ecf5;
+    --card: #f9faff;
+    --fg: #14172b;
+    --muted: #5d6384;
+    --line: #d4d8ea;
+    --accent: #4b45e6;
+    --row: #eef0fa;
+    --font-display: "Bricolage Grotesque", system-ui, sans-serif;
+    --font-mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0d0f1e; --card: #161934; --fg: #eceefb; --muted: #9298c0;
+      --line: #2a2e57; --accent: #8a85ff; --row: #1d2142; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0d0f1e; --card: #161934; --fg: #eceefb; --muted: #9298c0;
+    --line: #2a2e57; --accent: #8a85ff; --row: #1d2142; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-mono);
+    font-size: 15px;
+    padding-inline: 16px;
+    padding-block: 32px;
+  }
+  .wrap { max-width: 1100px; margin-inline: auto; display: flex; flex-direction: column; gap: 28px; }
+
+  header { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+  .back { color: var(--muted); text-decoration: none; font-size: 13px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .back:hover { color: var(--accent); }
+  h1 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 800;
+    font-size: clamp(40px, 9vw, 64px);
+    letter-spacing: -0.045em;
+    line-height: 1;
+  }
+  .count { margin: 0; color: var(--muted); font-size: 13px; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+    gap: 14px;
+  }
+  .grid button {
+    all: unset;
+    cursor: zoom-in;
+    display: block;
+    border-radius: 18px;
+    overflow: hidden;
+    background: var(--row);
+    border: 1px solid var(--line);
+    aspect-ratio: 1;
+    transition: transform 0.15s ease;
+  }
+  .grid button:hover { transform: translateY(-2px); }
+  .grid button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .status {
+    padding: 20px;
+    border-radius: 18px;
+    background: var(--card);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+
+  dialog {
+    border: none;
+    padding: 0;
+    background: transparent;
+    max-width: 96vw;
+    max-height: 96vh;
+  }
+  dialog::backdrop { background: rgba(5, 6, 15, 0.85); }
+  dialog img { display: block; max-width: 96vw; max-height: 90vh; border-radius: 14px; }
+  dialog .close {
+    all: unset;
+    cursor: pointer;
+    display: block;
+    margin: 0 0 8px auto;
+    padding: 6px 12px;
+    border-radius: 10px;
+    background: var(--card);
+    color: var(--fg);
+    font-size: 13px;
+  }
+  dialog .close:focus-visible { outline: 2px solid var(--accent); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .grid button { transition: none; }
+    .grid button:hover { transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="./">&larr; Back</a>
+    <h1>Portfolio</h1>
+    <p class="count" id="count">Loading photos…</p>
+  </header>
+
+  <main>
+    <div class="grid" id="grid"></div>
+    <div class="status" id="status" hidden></div>
+  </main>
+</div>
+
+<dialog id="viewer">
+  <button class="close" id="close" type="button">Close</button>
+  <img id="big" alt="">
+</dialog>
+
+<script>
+  // Settings. Change these if the repo or folder ever moves.
+  var OWNER = "33bloxy";
+  var REPO = "33bloxy.github.io";
+  var BRANCH = "main";
+  var FOLDER = "Portfolio";            // folder with the photos, relative to the site root
+  var EXT = /\.(png|jpe?g|gif|webp|avif|svg)$/i;
+
+  var grid = document.getElementById("grid");
+  var statusBox = document.getElementById("status");
+  var count = document.getElementById("count");
+  var viewer = document.getElementById("viewer");
+  var big = document.getElementById("big");
+
+  function showStatus(msg) {
+    statusBox.textContent = msg;
+    statusBox.hidden = false;
+    count.textContent = "";
+  }
+
+  function render(files) {
+    if (!files.length) {
+      showStatus("No photos found in " + FOLDER + "/ yet.");
+      return;
+    }
+    count.textContent = files.length + (files.length === 1 ? " photo" : " photos");
+    files.forEach(function (f) {
+      var src = FOLDER + "/" + encodeURIComponent(f.name); // relative path, served by the site itself
+      var b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("aria-label", "Open " + f.name);
+      var img = document.createElement("img");
+      img.src = src;
+      img.alt = f.name.replace(/\.[^.]+$/, "");
+      img.loading = "lazy";
+      b.appendChild(img);
+      b.addEventListener("click", function () {
+        big.src = src;
+        big.alt = img.alt;
+        viewer.showModal();
+      });
+      grid.appendChild(b);
+    });
+  }
+
+  document.getElementById("close").addEventListener("click", function () { viewer.close(); });
+  viewer.addEventListener("click", function (e) { if (e.target === viewer) viewer.close(); });
+
+  var api = "https://api.github.com/repos/" + OWNER + "/" + REPO +
+            "/contents/" + FOLDER.split("/").map(encodeURIComponent).join("/") + "?ref=" + BRANCH;
+
+  fetch(api)
+    .then(function (r) {
+      if (!r.ok) throw new Error("GitHub answered " + r.status);
+      return r.json();
+    })
+    .then(function (list) {
+      var files = list
+        .filter(function (f) { return f.type === "file" && EXT.test(f.name); })
+        .sort(function (a, b) { return a.name.localeCompare(b.name, undefined, { numeric: true }); });
+      render(files);
+    })
+    .catch(function (err) {
+      showStatus("Could not load the photos...");
+    });
+</script>
+</body>
+</html>
